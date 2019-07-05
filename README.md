@@ -19,10 +19,10 @@ Uses od, tr, sed, awk.
 Home page: https://github.com/avih/shlolcat
 ```
 
-### Screenshots
+## Screenshots
 
-## Default (true colors, saturation 75):
+### Default (true colors, saturation 75):
 ![sgrtab screenshots using xterm](https://raw.githubusercontent.com/avih/auxiliary/master/images/shlolcat/default.png)
 
-## De-saturated, horizontal, 256 colors `shlolcat -s40 -y0 -c256`:
+### De-saturated, horizontal, 256 colors (`shlolcat -s40 -y0 -c256`):
 ![sgrtab screenshots using xterm](https://raw.githubusercontent.com/avih/auxiliary/master/images/shlolcat/custom.png)
