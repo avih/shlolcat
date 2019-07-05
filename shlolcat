@@ -65,10 +65,11 @@ list_as_octals() { od -b -v | tr -s ' ' | cut -s -d" " -f2- | tr " " \\n; }
 rand() { awk "BEGIN{srand(); print int($1+rand()*($2-$1+1))}"; }  # min, max
 
 case $colors in
+    # define add_cc() for the -c value: adds color+char to $line as printf fmt
     # the 256 colors approximation is highly inaccurate, but reasonably useful.
-    t|true) color_set() { printf "\033[38;2;$r;$g;${b}m"; };;
-     2|256) color_set() { printf "\033[38;5;$((16 + 36*(r/45) + 6*(g/45) + b/45))m"; };;
-         8) color_set() { printf "\033[$((30 + 4*(b>127) + 2*(g>127) + (r>127) ))m"; };;
+    t|true) add_cc() { line=$line"\033[38;2;$r;$g;${b}m$1"; };;
+     2|256) add_cc() { line=$line"\033[38;5;$((16 + 36*(r/45) + 6*(g/45) + b/45))m$1"; };;
+         8) add_cc() { line=$line"\033[$((30 + 4*(b>127) + 2*(g>127) + (r>127) ))m$1"; };;
 esac
 
 # advance color $r $g $b by $1 (0-255). state is maintained at $s .
@@ -91,20 +92,22 @@ cat -- "$@" | strip_colors | list_as_octals | {
 
     R=$r G=$g B=$b S=$s  # saved for next line
     x=0  # column for tab tracking
+    line=  # buffer for printing the line in one printf invocation
 
     trap 'printf \\033[m\\n' 2 3 6
     while read o; do
         case $o in
         012)  # newline
-            printf "\033[m\n"
+            printf "$line\033[m\n"
             r=$R g=$G b=$B s=$S
             color_cycle $dy
             R=$r G=$g B=$b S=$s
             x=0
+            line=
             ;;
         011)  # tab
             while :; do
-                printf " "
+                line=$line" "
                 color_cycle $dx
                 x=$((x+1))
                 [ $((x % 8)) != 0 ] || break;
@@ -112,12 +115,11 @@ cat -- "$@" | strip_colors | list_as_octals | {
             ;;
         [013]??)  # ascii7 or leading byte of utf8 codepoint
             color_cycle $dx
-            color_set
-            printf \\$o
+            add_cc \\$o
             x=$((x+1))
             ;;
         ???)  # utf8 non-leading byte
-            printf \\$o
+            line=$line\\$o
             ;;
         esac
     done
