@@ -1,0 +1,122 @@
+#!/bin/sh
+
+# shlolcat - lolcat written as a posix shell script and friends.
+# Copyright 2019 Avi Halachmi (:avih) avihpit@yahoo.com
+# License: MIT
+# Home page: https://github.com/avih/shlolcat
+
+force=no
+colors=true
+sat=75
+dx=10 dy=30
+
+usage_syn="Usage: shlolcat [-h] [-f] [-c COLORS] [-s SAT] [-x DX] [-y DY] [FILE ...]"
+
+usage() {
+    echo "$usage_syn"
+    echo "Concatenate files and print to standard output in rainbow colors."
+    echo "With no FILE, or when FILE is -, read standard input."
+    echo
+    echo "  -h    Print this help and exit."
+    echo "  -f    Force color even if standard output is not a terminal."
+    echo "  -c 8|256|true: Colors to use. Default is true colors."
+    echo "  -s SAT       : Saturation (0-100). Current: -s $sat."
+    echo "  -x DX, -y DY : horizontal/vertical color progression step (0-255),"
+    echo "                 affect direction and density. Current: -x $dx -y $dy."
+    echo
+    echo "Uses od, tr, sed, awk."
+    echo "Home page: https://github.com/avih/shlolcat"
+}
+
+err_exit() {
+    [ -z "${1-}" ] || >&2 echo "Error: $1"
+    >&2 echo "$usage_syn"
+    exit 1
+}
+
+# true if $1 is an integer and $2 <= $1 <= $3
+intrange() {
+    case $1 in *[!0123456789]*|'') return 1; esac
+    [ "$1" -ge "$2" ] && [ "$1" -le "$3" ];
+}
+
+while getopts c:fhs:x:y: o; do
+    case $o in
+        h) usage; exit 0;;
+        f) force=yes;;
+        c) case $OPTARG in 8|2|256|t|true) colors=$OPTARG;; *) err_exit "bad COLORS"; esac;;
+        s) intrange "$OPTARG" 0 100 && sat=$OPTARG || err_exit "bad SAT";;
+        x) intrange "$OPTARG" 0 255 && dx=$OPTARG || err_exit "bad DX";;
+        y) intrange "$OPTARG" 0 255 && dy=$OPTARG || err_exit "bad DY";;
+       \?) err_exit;;
+    esac
+done
+mn=$((255 - 255*sat/100))  # minimum r/g/b value is derived from saturation
+
+shift $((OPTIND-1))
+[ "$force" = yes ] || [ -t 1 ] || exec cat -- "$@"  # done - plain cat
+
+
+strip_colors() { sed "s,$(printf \\033)\[[0-9;]*m,,g"; }
+list_as_octals() { od -b -v | tr -s ' ' | cut -s -d" " -f2- | tr " " \\n; }
+rand() { awk -v min=$1 -v max=$2 'BEGIN{srand(); print int(min+rand()*(max-min+1))}'; }
+
+case $colors in
+    # the 256 colors approximation is highly inaccurate, but reasonably useful.
+    t|true) color_set() { printf "\033[38;2;$r;$g;${b}m"; };;
+     2|256) color_set() { printf "\033[38;5;$((16 + 36*(r/45) + 6*(g/45) + b/45))m"; };;
+         8) color_set() { printf "\033[$((30 + 4*(b>127) + 2*(g>127) + (r>127) ))m"; };;
+esac
+
+# advance color $r $g $b by $1 (0-255). state is maintained at $s .
+color_cycle() {
+    case $s in
+        G+) g=$((g+$1)); [ 255 -gt $g ] || g=255 s=R- ;;
+        R-) r=$((r-$1)); [ $mn -lt $r ] || r=$mn s=B+ ;;
+        B+) b=$((b+$1)); [ 255 -gt $b ] || b=255 s=G- ;;
+        G-) g=$((g-$1)); [ $mn -lt $g ] || g=$mn s=R+ ;;
+        R+) r=$((r+$1)); [ 255 -gt $r ] || r=255 s=B- ;;
+        B-) b=$((b-$1)); [ $mn -lt $b ] || b=$mn s=G+ ;;
+    esac
+}
+
+# main
+cat -- "$@" | strip_colors | list_as_octals | {
+    r=255 g=$mn b=$mn s=G+
+    n=$(rand 0 25 2>/dev/null || echo 0)
+    while [ $n -gt 0 ]; do color_cycle 60; n=$((n-1)); done
+
+    R=$r G=$g B=$b S=$s  # saved for next line
+    x=0  # column for tab tracking
+
+    trap 'printf \\033[m\\n' 2 3 6
+    while read o; do
+        case $o in
+        012)  # newline
+            printf "\033[m\n"
+            r=$R g=$G b=$B s=$S
+            color_cycle $dy
+            R=$r G=$g B=$b S=$s
+            x=0
+            ;;
+        011)  # tab
+            while :; do
+                printf " "
+                color_cycle $dx
+                x=$((x+1))
+                [ $((x % 8)) != 0 ] || break;
+            done
+            ;;
+        [013]??)  # ascii7 or leading byte of utf8 codepoint
+            color_cycle $dx
+            color_set
+            printf \\$o
+            x=$((x+1))
+            ;;
+        ???)  # utf8 non-leading byte
+            printf \\$o
+            ;;
+        esac
+    done
+    printf "\033[m"
+}
