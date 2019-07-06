@@ -10,6 +10,7 @@ colors=true
 off=  # pattern offset, random if empty
 sat=75
 dx=10 dy=30
+tab=8  # assumption about the terminal's tab width
 
 usage_syn="Usage: shlolcat [-h] [-f] [-cCOLORS] [-oO] [-sSAT] [-xDX] [-yDY] [FILE ...]"
 
@@ -105,11 +106,11 @@ cat -- "$@" | strip_CSI_esc | list_as_octals | {
             line=
             ;;
         011)  # tab
+            line=$line\\$o
             while :; do
-                line=$line" "
                 color_cycle $dx
                 x=$((x+1))
-                [ $((x % 8)) != 0 ] || break;
+                [ $((x % tab)) != 0 ] || break
             done
             ;;
         [013]??)  # ascii7 or leading byte of utf8 codepoint
