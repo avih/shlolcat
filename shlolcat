@@ -59,8 +59,7 @@ mn=$((255 - 255*sat/100))  # minimum r/g/b value is derived from saturation
 shift $((OPTIND-1))
 [ "$force" = yes ] || [ -t 1 ] || exec cat -- "$@"  # done - plain cat
 
-
-strip_colors() { sed "s,$(printf \\033)\[[0123456789;]*m,,g"; }
+strip_CSI_esc() { LC_ALL=C sed "s,$(printf \\033)\[[^@-~]*.,,g"; } # inc. colors
 list_as_octals() { od -b -v | tr -s ' ' | cut -s -d" " -f2- | tr " " \\n; }
 rand() { awk "BEGIN{srand(); print int($1+rand()*($2-$1+1))}"; }  # min, max
 
@@ -85,7 +84,7 @@ color_cycle() {
 }
 
 # main
-cat -- "$@" | strip_colors | list_as_octals | {
+cat -- "$@" | strip_CSI_esc | list_as_octals | {
     r=255 g=$mn b=$mn s=G+
     [ "$off" ] || off=$(rand 0 100)  # 100x16 is roughly full cycle with -s100
     while [ $off -gt 0 ]; do color_cycle 16; off=$((off-1)); done
