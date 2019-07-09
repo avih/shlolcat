@@ -84,11 +84,11 @@ cat -- "$@" | strip_CSI_esc | list_as_octals | {
     x=0  # column for tab tracking
     line=  # buffer for printing the line in one printf invocation
 
-    trap 'printf \\033[m\\n' 2 3 6
+    trap 'printf \\033[39m' 2 3 6
     while read o; do
         case $o in
         012)  # newline
-            printf "$line\033[m\n"
+            printf "$line\n"
             r=$R g=$G b=$B s=$S
             color_cycle $dy
             R=$r G=$g B=$b S=$s
@@ -96,22 +96,23 @@ cat -- "$@" | strip_CSI_esc | list_as_octals | {
             line=
             ;;
         011)  # tab
-            line=$line\\$o
-            while :; do
+            color_cycle $dx
+            add_cc \\$o
+            x=$((x+1))
+            while [ $((x % tab)) != 0 ]; do
                 color_cycle $dx
                 x=$((x+1))
-                [ $((x % tab)) != 0 ] || break
             done
             ;;
-        [013]??)  # ascii7 or leading byte of utf8 codepoint
+        [013]??)  # ascii7 or utf8 leading byte
             color_cycle $dx
             add_cc \\$o
             x=$((x+1))
             ;;
-        ???)  # utf8 non-leading byte
+        ???)  # utf8 continuation byte
             line=$line\\$o
             ;;
         esac
     done
-    printf "$line\033[m"
+    printf "$line\033[39m"
 }
