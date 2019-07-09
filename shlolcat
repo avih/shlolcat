@@ -123,5 +123,5 @@ cat -- "$@" | strip_CSI_esc | list_as_octals | {
             ;;
         esac
     done
-    printf "\033[m"
+    printf "$line\033[m"
 }
