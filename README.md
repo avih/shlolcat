@@ -18,6 +18,9 @@ Uses od, tr, awk.
 Home page: https://github.com/avih/shlolcat
 ```
 
+*Note*: shell performance has major effect with this script. E.g. `dash` may
+run it 3x-5x faster than `bash`. YMMV.
+
 ## Screenshots
 
 ### Default:
