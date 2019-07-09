@@ -5,27 +5,19 @@
 # License: MIT
 # Home page: https://github.com/avih/shlolcat
 
-force=no
-colors=true
-off=  # pattern offset, random if empty
-sat=75
-dx=10 dy=30
+colors=true off= min=80 max=255 dx=10 dy=30
 tab=8  # assumption about the terminal's tab width
 
-usage_syn="Usage: shlolcat [-h] [-f] [-cCOLORS] [-oO] [-sSAT] [-xDX] [-yDY] [FILE ...]"
-
 usage() {
-    echo "$usage_syn"
+    echo "Usage: shlolcat [OPTIONS]... [FILE]..."
     echo "Concatenate files and print to standard output in rainbow colors."
     echo "With no FILE, or when FILE is -, read standard input."
     echo
-    echo "  -h    Print this help and exit."
-    echo "  -f    Force color even if standard output is not a terminal."
-    echo "  -c 8|256|true: Colors to use. Default is true colors."
-    echo "  -o O         : Offset the pattern (0-100). Default: random."
-    echo "  -s SAT       : Saturation (0-100). Current: -s $sat."
-    echo "  -x DX, -y DY : horizontal/vertical color advancements (0-255), affect"
-    echo "                 pattern direction and density. Current: -x $dx -y $dy."
+    echo "  -h             Print this help and exit."
+    echo "  -c COLORS      (8|256|true) Colors to use. Default: -c $colors."
+    echo "  -a MIN -b MAX  (0-255) R/G/B values limits. Default: -a $min -b $max."
+    echo "  -x DX  -y DY   (0-255) char/line color advancement. Default: -x $dx -y $dy."
+    echo "  -o OFFSET      (0-100) Offset the pattern. Default: random."
     echo
     echo "Uses od, tr, sed, awk."
     echo "Home page: https://github.com/avih/shlolcat"
@@ -33,7 +25,7 @@ usage() {
 
 err_exit() {
     [ -z "${1-}" ] || >&2 echo "Error: $1"
-    >&2 echo "$usage_syn"
+    >&2 echo "Usage: shlolcat -h | [-a:b:c:x:y:o:] [FILE]..."
     exit 1
 }
 
@@ -43,22 +35,20 @@ intrange() {
     [ "$1" -ge "$2" ] && [ "$1" -le "$3" ];
 }
 
-while getopts c:fhs:o:x:y: o; do
+while getopts a:b:c:ho:x:y: o; do
     case $o in
         h) usage; exit 0;;
-        f) force=yes;;
         c) case $OPTARG in 8|2|256|t|true) colors=$OPTARG;; *) err_exit "bad COLORS"; esac;;
-        o) intrange "$OPTARG" 0 100 && off=$OPTARG || err_exit "bad O";;
-        s) intrange "$OPTARG" 0 100 && sat=$OPTARG || err_exit "bad SAT";;
+        o) intrange "$OPTARG" 0 100 && off=$OPTARG || err_exit "bad OFFSET";;
+        a) intrange "$OPTARG" 0 255 && min=$OPTARG || err_exit "bad MIN";;
+        b) intrange "$OPTARG" 0 255 && max=$OPTARG || err_exit "bad MAX";;
         x) intrange "$OPTARG" 0 255 && dx=$OPTARG || err_exit "bad DX";;
         y) intrange "$OPTARG" 0 255 && dy=$OPTARG || err_exit "bad DY";;
        \?) err_exit;;
     esac
 done
-mn=$((255 - 255*sat/100))  # minimum r/g/b value is derived from saturation
-
+[ $min -le $max ] || err_exit "MIN is bigger than MAX"
 shift $((OPTIND-1))
-[ "$force" = yes ] || [ -t 1 ] || exec cat -- "$@"  # done - plain cat
 
 strip_CSI_esc() { LC_ALL=C sed "s,$(printf \\033)\[[^@-~]*.,,g"; } # inc. colors
 list_as_octals() { od -b -v | tr -s ' ' | cut -s -d" " -f2- | tr " " \\n; }
@@ -75,18 +65,18 @@ esac
 # advance color $r $g $b by $1 (0-255). state is maintained at $s .
 color_cycle() {
     case $s in
-        G+) g=$((g+$1)); [ 255 -gt $g ] || g=255 s=R- ;;
-        R-) r=$((r-$1)); [ $mn -lt $r ] || r=$mn s=B+ ;;
-        B+) b=$((b+$1)); [ 255 -gt $b ] || b=255 s=G- ;;
-        G-) g=$((g-$1)); [ $mn -lt $g ] || g=$mn s=R+ ;;
-        R+) r=$((r+$1)); [ 255 -gt $r ] || r=255 s=B- ;;
-        B-) b=$((b-$1)); [ $mn -lt $b ] || b=$mn s=G+ ;;
+        G+) g=$((g+$1)); [ $max -gt $g ] || g=$max s=R- ;;
+        R-) r=$((r-$1)); [ $min -lt $r ] || r=$min s=B+ ;;
+        B+) b=$((b+$1)); [ $max -gt $b ] || b=$max s=G- ;;
+        G-) g=$((g-$1)); [ $min -lt $g ] || g=$min s=R+ ;;
+        R+) r=$((r+$1)); [ $max -gt $r ] || r=$max s=B- ;;
+        B-) b=$((b-$1)); [ $min -lt $b ] || b=$min s=G+ ;;
     esac
 }
 
 # main
 cat -- "$@" | strip_CSI_esc | list_as_octals | {
-    r=255 g=$mn b=$mn s=G+
+    r=$max g=$min b=$min s=G+
     [ "$off" ] || off=$(rand 0 100)  # 100x16 is roughly full cycle with -s100
     while [ $off -gt 0 ]; do color_cycle 16; off=$((off-1)); done
 
