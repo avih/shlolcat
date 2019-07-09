@@ -5,7 +5,7 @@
 # License: MIT
 # Home page: https://github.com/avih/shlolcat
 
-colors=true off= min=80 max=255 dx=10 dy=30
+esc=yes colors=true off= min=80 max=255 dx=10 dy=30
 tab=8  # assumption about the terminal's tab width
 
 usage() {
@@ -14,18 +14,19 @@ usage() {
     echo "With no FILE, or when FILE is -, read standard input."
     echo
     echo "  -h             Print this help and exit."
+    echo "  -e             Strip escape sequences from input."
     echo "  -c COLORS      (8|256|true) Colors to use. Default: -c $colors."
     echo "  -a MIN -b MAX  (0-255) R/G/B values limits. Default: -a $min -b $max."
     echo "  -x DX  -y DY   (0-255) char/line color advancement. Default: -x $dx -y $dy."
     echo "  -o OFFSET      (0-100) Offset the pattern. Default: random."
     echo
-    echo "Uses od, tr, sed, awk."
+    echo "Uses od, tr, awk."
     echo "Home page: https://github.com/avih/shlolcat"
 }
 
 err_exit() {
     [ -z "${1-}" ] || >&2 echo "Error: $1"
-    >&2 echo "Usage: shlolcat -h | [-a:b:c:x:y:o:] [FILE]..."
+    >&2 echo "Usage: shlolcat -h | [-ea:b:c:x:y:o:] [FILE]..."
     exit 1
 }
 
@@ -35,9 +36,10 @@ intrange() {
     [ "$1" -ge "$2" ] && [ "$1" -le "$3" ];
 }
 
-while getopts a:b:c:ho:x:y: o; do
+while getopts a:b:c:eho:x:y: o; do
     case $o in
         h) usage; exit 0;;
+        e) esc=no;;
         c) case $OPTARG in 8|2|256|t|true) colors=$OPTARG;; *) err_exit "bad COLORS"; esac;;
         o) intrange "$OPTARG" 0 100 && off=$OPTARG || err_exit "bad OFFSET";;
         a) intrange "$OPTARG" 0 255 && min=$OPTARG || err_exit "bad MIN";;
@@ -50,7 +52,6 @@ done
 [ $min -le $max ] || err_exit "MIN is bigger than MAX"
 shift $((OPTIND-1))
 
-strip_CSI_esc() { LC_ALL=C sed "s,$(printf \\033)\[[^@-~]*.,,g"; } # inc. colors
 list_as_octals() { od -b -v | tr -s ' ' | cut -s -d" " -f2- | tr " " \\n; }
 rand() { awk "BEGIN{srand(); print int($1+rand()*($2-$1+1))}"; }  # min, max
 
@@ -75,27 +76,29 @@ color_cycle() {
 }
 
 # main
-cat -- "$@" | strip_CSI_esc | list_as_octals | {
+cat -- "$@" | list_as_octals | {
     r=$max g=$min b=$min s=G+
     [ "$off" ] || off=$(rand 0 100)  # 100x16 is roughly full cycle with -s100
     while [ $off -gt 0 ]; do color_cycle 16; off=$((off-1)); done
 
     R=$r G=$g B=$b S=$s  # saved for next line
-    x=0  # column for tab tracking
-    line=  # buffer for printing the line in one printf invocation
+    x=0 e=0 line=  # column for tab tracking, esc state, line buffer
 
     trap 'printf \\033[39m' 2 3 6
     while read o; do
-        case $o in
-        012)  # newline
+        case $e$o in
+        0033)  # esc
+            [ "$esc" = no ] || line=$line\\$o
+            e=1
+            ;;
+        0012)  # newline
             printf "$line\n"
             r=$R g=$G b=$B s=$S
             color_cycle $dy
             R=$r G=$g B=$b S=$s
-            x=0
-            line=
+            x=0 line=
             ;;
-        011)  # tab
+        0011)  # tab
             color_cycle $dx
             add_cc \\$o
             x=$((x+1))
@@ -104,13 +107,21 @@ cat -- "$@" | strip_CSI_esc | list_as_octals | {
                 x=$((x+1))
             done
             ;;
-        [013]??)  # ascii7 or utf8 leading byte
+        0[013]??)  # ascii7 or utf8 leading byte
             color_cycle $dx
             add_cc \\$o
             x=$((x+1))
             ;;
-        ???)  # utf8 continuation byte
+        0???)  # utf8 continuation byte
             line=$line\\$o
+            ;;
+        1???)  # first char after esc. 133 is '['
+            [ $esc = no ] || line=$line\\$o
+            case $o in 133) e=2;; *) e=0; esac
+            ;;
+        2???)  # inside CSI sequence
+            [ $esc = no ] || line=$line\\$o
+            case $o in 1??) e=0; esac
             ;;
         esac
     done
