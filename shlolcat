@@ -52,8 +52,10 @@ done
 [ $min -le $max ] || err_exit "MIN is bigger than MAX"
 shift $((OPTIND-1))
 
-list_as_octals() { od -b -v | tr -s ' ' | cut -s -d" " -f2- | tr " " \\n; }
-rand() { awk "BEGIN{srand(); print int($1+rand()*($2-$1+1))}"; }  # min, max
+# list_as_octals can be replaced with this C program (include stdio):
+# int main() {int c; while((c=getchar()) != EOF) printf("%03o\n", c); return 0;}
+list_as_octals() { od -b -v -A n | tr -s " " \\n; }
+rand() { awk "BEGIN{srand($(date +%s)-$$); print int(rand()*$1)}"; }  # 0..$1-1
 
 case $colors in
     # define add_cc() for the -c value: adds color+char to $line as printf fmt
@@ -78,7 +80,7 @@ color_cycle() {
 # main
 cat -- "$@" | list_as_octals | {
     r=$max g=$min b=$min s=G+
-    [ "$off" ] || off=$(rand 0 100)  # 100x16 is roughly full cycle with -s100
+    [ "$off" ] || off=$(rand 100)  # 100x16 is roughly full cycle with -a0 -b255
     while [ $off -gt 0 ]; do color_cycle 16; off=$((off-1)); done
 
     R=$r G=$g B=$b S=$s  # saved for next line
