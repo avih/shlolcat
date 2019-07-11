@@ -20,7 +20,7 @@ usage() {
     echo "  -x DX  -y DY   (0-255) char/line color advancement. Default: -x $dx -y $dy."
     echo "  -o OFFSET      (0-100) Offset the pattern. Default: random."
     echo
-    echo "Uses od, tr, awk."
+    echo "Requires: od, tr, cksum, date."
     echo "Home page: https://github.com/avih/shlolcat"
 }
 
@@ -55,7 +55,7 @@ shift $((OPTIND-1))
 # list_as_octals can be replaced with this C program (include stdio):
 # int main() {int c; while((c=getchar()) != EOF) printf("%03o\n", c); return 0;}
 list_as_octals() { od -b -v -A n | tr -s " " \\n; }
-rand() { awk "BEGIN{srand($(date +%s)-$$); print int(rand()*$1)}"; }  # 0..$1-1
+rand() { sd=$(echo ${sd:-$(date)$$}|cksum); rnd=$((1${sd%????}%$1)); } # [0..$1)
 
 case $colors in
     # define add_cc() for the -c value: adds color+char to $line as printf fmt
@@ -80,7 +80,7 @@ color_cycle() {
 # main
 cat -- "$@" | list_as_octals | {
     r=$max g=$min b=$min s=G+
-    [ "$off" ] || off=$(rand 100)  # 100x16 is roughly full cycle with -a0 -b255
+    [ "$off" ] || { rand 100; off=$rnd; }  # 100x16 is full cycle with -a0 -b255
     while [ $off -gt 0 ]; do color_cycle 16; off=$((off-1)); done
 
     R=$r G=$g B=$b S=$s  # saved for next line

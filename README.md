@@ -14,7 +14,7 @@ With no FILE, or when FILE is -, read standard input.
   -x DX  -y DY   (0-255) char/line color advancement. Default: -x 10 -y 30.
   -o OFFSET      (0-100) Offset the pattern. Default: random.
 
-Uses od, tr, awk.
+Requires: od, tr, cksum, date.
 Home page: https://github.com/avih/shlolcat
 ```
 
