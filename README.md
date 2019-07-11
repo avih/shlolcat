@@ -9,7 +9,7 @@ With no FILE, or when FILE is -, read standard input.
 
   -h             Print this help and exit.
   -e             Strip escape sequences from input.
-  -c COLORS      (8|256|true) Colors to use. Default: -c true.
+  -c COLORS      (1|8|256|true) Colors to use. Default: -c true.
   -a MIN -b MAX  (0-255) R/G/B values limits. Default: -a 80 -b 255.
   -x DX  -y DY   (0-255) char/line color advancement. Default: -x 10 -y 30.
   -o OFFSET      (0-100) Offset the pattern. Default: random.

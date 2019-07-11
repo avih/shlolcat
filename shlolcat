@@ -5,7 +5,7 @@
 # License: MIT
 # Home page: https://github.com/avih/shlolcat
 
-esc=yes colors=true off= min=80 max=255 dx=10 dy=30
+esc=yes colors=true off= min=80 max=255 dx=10 dy=30 ab=
 tab=8  # assumption about the terminal's tab width
 
 usage() {
@@ -15,7 +15,7 @@ usage() {
     echo
     echo "  -h             Print this help and exit."
     echo "  -e             Strip escape sequences from input."
-    echo "  -c COLORS      (8|256|true) Colors to use. Default: -c $colors."
+    echo "  -c COLORS      (1|8|256|true) Colors to use. Default: -c $colors."
     echo "  -a MIN -b MAX  (0-255) R/G/B values limits. Default: -a $min -b $max."
     echo "  -x DX  -y DY   (0-255) char/line color advancement. Default: -x $dx -y $dy."
     echo "  -o OFFSET      (0-100) Offset the pattern. Default: random."
@@ -40,16 +40,17 @@ while getopts a:b:c:eho:x:y: o; do
     case $o in
         h) usage; exit 0;;
         e) esc=no;;
-        c) case $OPTARG in 8|2|256|t|true) colors=$OPTARG;; *) err_exit "bad COLORS"; esac;;
+        c) case $OPTARG in 1|8|2|256|t|true) colors=$OPTARG;; *) err_exit "bad COLORS"; esac;;
         o) intrange "$OPTARG" 0 100 && off=$OPTARG || err_exit "bad OFFSET";;
-        a) intrange "$OPTARG" 0 255 && min=$OPTARG || err_exit "bad MIN";;
-        b) intrange "$OPTARG" 0 255 && max=$OPTARG || err_exit "bad MAX";;
+        a) ab=1; intrange "$OPTARG" 0 255 && min=$OPTARG || err_exit "bad MIN";;
+        b) ab=1; intrange "$OPTARG" 0 255 && max=$OPTARG || err_exit "bad MAX";;
         x) intrange "$OPTARG" 0 255 && dx=$OPTARG || err_exit "bad DX";;
         y) intrange "$OPTARG" 0 255 && dy=$OPTARG || err_exit "bad DY";;
        \?) err_exit;;
     esac
 done
 [ $min -le $max ] || err_exit "MIN is bigger than MAX"
+case $colors in 1|8) [ "$ab" ] || min=0 max=255; esac  # set full range if unset
 shift $((OPTIND-1))
 
 # list_as_octals can be replaced with this C program (include stdio):
@@ -63,6 +64,7 @@ case $colors in
     t|true) add_cc() { line=$line"\033[38;2;$r;$g;${b}m$1"; };;
      2|256) add_cc() { line=$line"\033[38;5;$((16 + 36*(r/45) + 6*(g/45) + b/45))m$1"; };;
          8) add_cc() { line=$line"\033[$((30 + 4*(b>127) + 2*(g>127) + (r>127) ))m$1"; };;
+         1) add_cc() { line=$line"\033[$(( (r+g+b) > 383 ))m$1"; };; # no 22 on vt102
 esac
 
 # advance color $r $g $b by $1 (0-255). state is maintained at $s .
