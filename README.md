@@ -21,6 +21,8 @@ Home page: https://github.com/avih/shlolcat
 *Note*: shell performance has major effect with this script. E.g. `dash` may
 run it 3x-5x faster than `bash`. YMMV.
 
+If performance is critical(!), a C version is available at the `c-lolcat/` dir.
+
 ## Screenshots
 
 ### Default:
