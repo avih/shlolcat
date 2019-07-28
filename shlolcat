@@ -42,11 +42,11 @@ while getopts a:b:c:eho:x:y: o; do
         e) esc=no;;
         c) case $OPTARG in 1|8|2|256|t|true) colors=$OPTARG;; *) err_exit "bad COLORS"; esac;;
         o) intrange "$OPTARG" 0 100 && off=$OPTARG || err_exit "bad OFFSET";;
-        a) ab=1; intrange "$OPTARG" 0 255 && min=$OPTARG || err_exit "bad MIN";;
-        b) ab=1; intrange "$OPTARG" 0 255 && max=$OPTARG || err_exit "bad MAX";;
+        a) intrange "$OPTARG" 0 255 && min=$OPTARG ab=1 || err_exit "bad MIN";;
+        b) intrange "$OPTARG" 0 255 && max=$OPTARG ab=1 || err_exit "bad MAX";;
         x) intrange "$OPTARG" 0 255 && dx=$OPTARG || err_exit "bad DX";;
         y) intrange "$OPTARG" 0 255 && dy=$OPTARG || err_exit "bad DY";;
-       \?) err_exit;;
+        *) err_exit;;
     esac
 done
 [ $min -le $max ] || err_exit "MIN is bigger than MAX"
@@ -59,12 +59,12 @@ list_as_octals() { od -b -v -A n | tr -s " " \\n; }
 rand() { sd=$(echo ${sd:-$(date)$$}|cksum); rnd=$((1${sd%????}%$1)); } # [0..$1)
 
 case $colors in
-    # define add_cc() for the -c value: adds color+char to $line as printf fmt
+    # define add_cc() for the -c value: adds color+octal to $line as printf fmt
     # the 256 colors approximation is highly inaccurate, but reasonably useful.
-    t|true) add_cc() { line=$line"\033[38;2;$r;$g;${b}m$1"; };;
-     2|256) add_cc() { line=$line"\033[38;5;$((16 + 36*(r/45) + 6*(g/45) + b/45))m$1"; };;
-         8) add_cc() { line=$line"\033[$((30 + 4*(b>127) + 2*(g>127) + (r>127) ))m$1"; };;
-         1) add_cc() { line=$line"\033[$(( (r+g+b) > 383 ))m$1"; };; # no 22 on vt102
+    t|true) add_cc() { line=$line"\033[38;2;$r;$g;${b}m\\$1"; };;
+     2|256) add_cc() { line=$line"\033[38;5;$((16 + 36*(r/45) + 6*(g/45) + b/45))m\\$1"; };;
+         8) add_cc() { line=$line"\033[$((30 + 4*(b>127) + 2*(g>127) + (r>127) ))m\\$1"; };;
+         1) add_cc() { line=$line"\033[$(( (r+g+b) > 383 ))m\\$1"; };; # no 22 on vt102
 esac
 
 # advance color $r $g $b by $1 (0-255). state is maintained at $s .
@@ -104,7 +104,7 @@ cat -- "$@" | list_as_octals | {
             ;;
         0011)  # tab
             color_cycle $dx
-            add_cc \\$o
+            add_cc $o
             x=$((x+1))
             while [ $((x % tab)) != 0 ]; do
                 color_cycle $dx
@@ -113,7 +113,7 @@ cat -- "$@" | list_as_octals | {
             ;;
         0[013]??)  # ascii7 or utf8 leading byte
             color_cycle $dx
-            add_cc \\$o
+            add_cc $o
             x=$((x+1))
             ;;
         0???)  # utf8 continuation byte
@@ -129,5 +129,5 @@ cat -- "$@" | list_as_octals | {
             ;;
         esac
     done
-    printf "$line\033[39m"
+    case $colors in 1|8) printf "$line\033[0m";; *) printf "$line\033[39m"; esac
 }
