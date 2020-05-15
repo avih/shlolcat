@@ -140,6 +140,6 @@ int main(int argc, char **argv) {
 
     } while (*argv && *(++argv));
 
-    printf("\x1b[%dm", (colors == 8 || colors == 1) ? 0 : 39);
+    printf("\x1b[0m");
     return rv;
 }

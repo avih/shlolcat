@@ -88,7 +88,7 @@ cat -- "$@" | list_as_octals | {
     R=$r G=$g B=$b S=$s  # saved for next line
     x=0 e=0 line=  # column for tab tracking, esc state, line buffer
 
-    trap 'printf \\033[39m' 2 3 6
+    trap 'printf \\033[0m' 2 3 6
     while read o; do
         case $e$o in
         0033)  # esc
@@ -129,5 +129,5 @@ cat -- "$@" | list_as_octals | {
             ;;
         esac
     done
-    case $colors in 1|8) printf "$line\033[0m";; *) printf "$line\033[39m"; esac
+    printf \\033[0m
 }
