@@ -39,18 +39,21 @@ int int0to(int high, const char *s, int *out) {
     return !((*out > 0 && *out <= high) || !strcmp(s, "0"));
 }
 
-char *oarg=0; int oind=1, oopt='?', opos=1;  /* to reset: oind=opos=1 */
-int geto(int c, char *const v[], const char *s) {
-#define msg_(s) fprintf(stderr, "%s: "s" -- %c\n", *v, oopt)
-    char *vi = v[oind];
-    if (!vi || *vi != '-' || !vi[1]) return -1;
-    if (vi[1] == '-' && !vi[2]) return oind++, -1;
-    oopt=vi[opos]; while (*s && *s != oopt) s++;
-    if (!vi[++opos]) oind++, opos=1;
-    if (!*s || *s == ':') return msg_("illegal option"), '?';
+/* POSIX-compliant geto[pt] w/ shorter func/var names. To reset: oind=opos=1; */
+/* For non-POSIX optional arguments as "x::" uncomment the line with `s[2]'.  */
+static char *oarg; static int oerr=1, oind=1, oopt, opos=1;
+static int geto(int c, char *const v[], const char *s) {
+  #define opm_(s) oerr && c ? fprintf(stderr, "%s: "s" -- %c\n", *v, oopt) : 0
+    if (oind > c || !v[oind] || *v[oind] != '-' || !v[oind][1]) return -1;
+    if (v[oind][1] == '-' && !v[oind][2]) return oind++, -1;
+    oarg=0, oopt=v[oind][opos], c=(*s != ':'); while(*s && *s != oopt) s++;
+    if (!v[oind][++opos]) oind++, opos=1;
+    if (!*s || *s == ':') return opm_("illegal option"), '?';
     if (s[1] != ':') return *s;
-    if (oind == c) return msg_("option requires an argument"), '?';
-    return oarg=v[oind]+(opos>1 ? opos : 0), oind++, opos=1, *s;
+ /* if (s[2] == ':') return opos>1 ? oarg=v[oind++]+opos, opos=1 : 0, *s; */
+    if (!v[oind++]) return opm_("option requires an argument"), c ? '?' : ':';
+    return oarg=v[oind-1]+(opos>1 ? opos : 0), opos=1, *s;
+  #undef opm_
 }
 
 void cycle_color(int d, int low, int high, int *r, int *g, int *b, int *s) {
