@@ -47,7 +47,7 @@ int geto(int c, char *const v[], const char *s) {
     if (vi[1] == '-' && !vi[2]) return oind++, -1;
     oopt=vi[opos]; while (*s && *s != oopt) s++;
     if (!vi[++opos]) oind++, opos=1;
-    if (!s || *s == ':') return msg_("illegal option"), '?';
+    if (!*s || *s == ':') return msg_("illegal option"), '?';
     if (s[1] != ':') return *s;
     if (oind == c) return msg_("option requires an argument"), '?';
     return oarg=v[oind]+(opos>1 ? opos : 0), oind++, opos=1, *s;
