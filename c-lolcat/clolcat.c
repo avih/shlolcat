@@ -107,9 +107,9 @@ int main(int argc, char **argv) {
         if (!f) { fprintf(stderr, "Error: cannot open '%s'\n", *argv); rv = 1; continue; }
 
         while (EOF != (c = fgetc(f))) {
-            if (e == 1) {  /* 1st char after escape */
+            if (e == 1) {  /* 1st char after escape: [->CSI, (/)->stay(rom) */
                 if (esc) fputc(c, stdout);
-                e = (c == '[') ? 2 : 0;
+                e = (c == '[') ? 2 : (c == '(' || c == ')') ? 1 : 0;
             } else if (e == 2) {  /* inside CSI sequence */
                 if (esc) fputc(c, stdout);
                 if (c >= 0x40 && c < 0x7f) e = 0;

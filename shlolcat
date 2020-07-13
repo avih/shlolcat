@@ -119,9 +119,9 @@ cat -- "$@" | list_as_octals | {
         0???)  # utf8 continuation byte
             line=$line\\$o
             ;;
-        1???)  # first char after esc. 133 is '['
+        1???)  # first char after esc. 133 is '[', 050/051 are '(',')' stay(rom)
             [ $esc = no ] || line=$line\\$o
-            case $o in 133) e=2;; *) e=0; esac
+            case $o in 133) e=2;; 05[01]) ;; *) e=0; esac
             ;;
         2???)  # inside CSI sequence
             [ $esc = no ] || line=$line\\$o
