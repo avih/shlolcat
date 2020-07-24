@@ -129,5 +129,5 @@ cat -- "$@" | list_as_octals | {
             ;;
         esac
     done
-    printf \\033[0m
+    printf "$line\033[0m"
 }
