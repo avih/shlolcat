@@ -20,7 +20,7 @@ usage() {
     echo "  -x DX  -y DY   (0-255) char/line color advancement. Default: -x $dx -y $dy."
     echo "  -o OFFSET      (0-100) Offset the pattern. Default: random."
     echo
-    echo "Requires: od, tr, cksum, date."
+    echo "Requires: od, cksum, date."
     echo "Home page: https://github.com/avih/shlolcat"
 }
 
@@ -53,9 +53,8 @@ done
 case $colors in 1|8) [ "$ab" ] || min=0 max=255; esac  # set full range if unset
 shift $((OPTIND-1))
 
-# list_as_octals can be replaced with this C program (include stdio):
-# int main() {int c; while((c=getchar()) != EOF) printf("%03o\n", c); return 0;}
-list_as_octals() { od -b -v -A n | tr -s " " \\n; }
+# list_as_octals prints stdin bytes as 3-digits octal values, several per line
+list_as_octals() { od -b -v -A n; }
 rand() { sd=$(echo ${sd:-$(date)$$}|cksum); rnd=$((1${sd%????}%$1)); } # [0..$1)
 
 case $colors in
@@ -89,7 +88,8 @@ cat -- "$@" | list_as_octals | {
     x=0 e=0 line=  # column for tab tracking, esc state, line buffer
 
     trap 'printf \\033[0m' 2 3 6
-    while read o; do
+    while read octals; do
+      for o in $octals; do
         case $e$o in
         0033)  # esc
             [ "$esc" = no ] || line=$line\\$o
@@ -128,6 +128,7 @@ cat -- "$@" | list_as_octals | {
             case $o in 1??) e=0; esac
             ;;
         esac
+      done
     done
     printf "$line\033[0m"
 }
