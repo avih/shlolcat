@@ -55,7 +55,7 @@ shift $((OPTIND-1))
 
 # list_as_octals prints stdin bytes as 3-digits octal values, several per line
 list_as_octals() { od -b -v -A n; }
-rand() { sd=$(echo ${sd:-$(date)$$}|cksum); rnd=$((1${sd%????}%$1)); } # [0..$1)
+rand() { sd=$(echo ${sd:-$(date)$$}|cksum); rnd=$((1${sd%? *}%$1)); } # [0..$1)
 
 case $colors in
     # define add_cc() for the -c value: adds color+octal to $line as printf fmt
