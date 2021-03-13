@@ -5,8 +5,7 @@
 # License: MIT
 # Home page: https://github.com/avih/shlolcat
 
-esc=yes colors=true off= min=80 max=255 dx=10 dy=30 ab=
-tab=8  # assumption about the terminal's tab width
+esc=yes colors=true off= min=80 max=255 dx=10 dy=30 ab= tab=8
 
 usage() {
     echo "Usage: shlolcat [OPTIONS]... [FILE]..."
@@ -19,6 +18,7 @@ usage() {
     echo "  -a MIN -b MAX  (0-255) R/G/B values limits. Default: -a $min -b $max."
     echo "  -x DX  -y DY   (0-255) char/line color advancement. Default: -x $dx -y $dy."
     echo "  -o OFFSET      (0-100) Offset the pattern. Default: random."
+    echo "  -t TAB         (1-100) Tabstops every TAB chars. Default: 8."
     echo
     echo "Requires: od, cksum, date."
     echo "Home page: https://github.com/avih/shlolcat"
@@ -26,7 +26,7 @@ usage() {
 
 err_exit() {
     [ -z "${1-}" ] || >&2 echo "Error: $1"
-    >&2 echo "Usage: shlolcat -h | [-ea:b:c:x:y:o:] [FILE]..."
+    >&2 echo "Usage: shlolcat -h | [-ea:b:c:x:y:o:t:] [FILE]..."
     exit 1
 }
 
@@ -36,12 +36,13 @@ intrange() {
     [ "$1" -ge "$2" ] && [ "$1" -le "$3" ];
 }
 
-while getopts a:b:c:eho:x:y: o; do
+while getopts a:b:c:eho:t:x:y: o; do
     case $o in
         h) usage; exit 0;;
         e) esc=no;;
         c) case $OPTARG in 1|8|2|256|t|true) colors=$OPTARG;; *) err_exit "bad COLORS"; esac;;
         o) intrange "$OPTARG" 0 100 && off=$OPTARG || err_exit "bad OFFSET";;
+        t) intrange "$OPTARG" 1 100 && tab=$OPTARG || err_exit "bad TAB";;
         a) intrange "$OPTARG" 0 255 && min=$OPTARG ab=1 || err_exit "bad MIN";;
         b) intrange "$OPTARG" 0 255 && max=$OPTARG ab=1 || err_exit "bad MAX";;
         x) intrange "$OPTARG" 0 255 && dx=$OPTARG || err_exit "bad DX";;
@@ -109,10 +110,11 @@ color_cycle() {
             ;;
         0011)  # tab
             color_cycle $dx
-            add_cc $o
+            line="$line "
             x=$((x+1))
             while [ $((x % tab)) != 0 ]; do
                 color_cycle $dx
+                line="$line "
                 x=$((x+1))
             done
             ;;

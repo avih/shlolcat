@@ -10,7 +10,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define TAB 8  /* assumption about the terminal */
+#define TAB 8  /* default tabstop */
 
 void usage() {
     puts("Usage: clolcat [OPTIONS]... [FILE]...");
@@ -23,6 +23,7 @@ void usage() {
     puts("  -a MIN -b MAX  (0-255) R/G/B values limits. Default: -a 80 -b 255.");
     puts("  -x DX  -y DY   (0-255) char/line color advancement. Default: -x 10 -y 30.");
     puts("  -o OFFSET      (0-100) Offset the pattern. Default: random.");
+    puts("  -t TAB         (0-100) Tabstops every TAB chars. Default: 8.");
     puts("");
     /* puts("Requires: od, tr, cksum, date."); */
     puts("Home page: https://github.com/avih/shlolcat");
@@ -30,7 +31,7 @@ void usage() {
 
 void exit_err(const char *s) {
     if (s) fprintf(stderr, "Error: %s\n", s);
-    fprintf(stderr, "Usage: clolcat -h | [-ea:b:c:x:y:o:] [FILE]...\n");
+    fprintf(stderr, "Usage: clolcat -h | [-ea:b:c:x:y:o:t:] [FILE]...\n");
     exit(1);
 }
 
@@ -77,14 +78,15 @@ void write_color(int colors, int r, int g, int b) {
 }
 
 int main(int argc, char **argv) {
-    int esc = 1, colors = -1, off = -1, lo = 80, hi = 255, dx = 10, dy = 30, ab = 0;
+    int esc = 1, colors = -1, off = -1, lo = 80, hi = 255, dx = 10, dy = 30, ab = 0, tab = TAB;
     int R, G, B, S, e, x, o, rv;
 
-    while ((o = geto(argc, argv, "a:b:c:eho:x:y:")) != -1) {
+    while ((o = geto(argc, argv, "a:b:c:eho:t:x:y:")) != -1) {
         switch (o) {
         case 'h': usage(); return 0;
         case 'e': esc = 0; break;
         case 'o': if (int0to(100, oarg, &off)) exit_err("bad OFFSET"); break;
+        case 't': if (int0to(100, oarg, &tab)) exit_err("bad TAB"); break;
         case 'a': if (int0to(255, oarg, &lo)) exit_err("bad MIN"); ab=1; break;
         case 'b': if (int0to(255, oarg, &hi)) exit_err("bad MAX"); ab=1; break;
         case 'x': if (int0to(255, oarg, &dx)) exit_err("bad DX"); break;
@@ -124,11 +126,12 @@ int main(int argc, char **argv) {
                 cycle_color(dy, lo, hi, &R, &G, &B, &S);
                 x = 0; r = R; g = G; b = B; s = S;
             } else if (c == '\t') {
-                cycle_color(dx, lo, hi, &r, &g, &b, &s);
-                write_color(colors, r, g, b);
-                fputc(c, stdout);
-                while (++x % TAB)
-                    cycle_color(dx, lo, hi, &r, &g, &b, &s);
+                if (tab != 0) {
+                    do {
+                        cycle_color(dx, lo, hi, &r, &g, &b, &s);
+                        fputc(' ', stdout);
+                    } while (++x % tab);
+                }
             } else if (c < 128 || (c & 64)) {  /* ascii7 or utf8 leading byte */
                 cycle_color(dx, lo, hi, &r, &g, &b, &s);
                 write_color(colors, r, g, b);
