@@ -62,10 +62,10 @@ rand() { sd=$(echo ${sd:-$(date)$$}|cksum); rnd=$((1${sd%? *}%$1)); } # [0..$1)
 case $colors in
     # define add_cc() for the -c value: adds color+octal to $line as printf fmt
     # the 256 colors approximation is highly inaccurate, but reasonably useful.
-    t|true) add_cc() { line=$line"\033[38;2;$r;$g;${b}m\\$1"; };;
-     2|256) add_cc() { line=$line"\033[38;5;$((16 + 36*(r/45) + 6*(g/45) + b/45))m\\$1"; };;
-         8) add_cc() { line=$line"\033[$((30 + 4*(b>127) + 2*(g>127) + (r>127) ))m\\$1"; };;
-         1) add_cc() { line=$line"\033[$(( (r+g+b) > 383 ))m\\$1"; };; # no 22 on vt102
+    t|true) add_cc() { buf=$buf"\033[38;2;$r;$g;${b}m\\$1"; };;
+     2|256) add_cc() { buf=$buf"\033[38;5;$((16 + 36*(r/45) + 6*(g/45) + b/45))m\\$1"; };;
+         8) add_cc() { buf=$buf"\033[$((30 + 4*(b>127) + 2*(g>127) + (r>127) ))m\\$1"; };;
+         1) add_cc() { buf=$buf"\033[$(( (r+g+b) > 383 ))m\\$1"; };; # no 22 on vt102
 esac
 
 # advance color $r $g $b by $1 (0-255). state is maintained at $s .
@@ -90,7 +90,7 @@ color_cycle() {
     while [ $off -gt 0 ]; do color_cycle 16; off=$((off-1)); done
 
     R=$r G=$g B=$b S=$s  # saved for next line
-    x=0 e=0 line=  # column for tab tracking, esc state, line buffer
+    x=0 e=0 buf= fl= # column for tab tracking, esc state, output buffer, flush
 
     for sig in 2 15; do trap 'printf \\033[0m; exit '$((128+sig)) $sig; done
 
@@ -98,15 +98,14 @@ color_cycle() {
       for o in $octals; do
         case $e$o in
         0033)  # esc
-            [ "$esc" = no ] || line=$line\\$o
+            [ "$esc" = no ] || buf=$buf\\$o
             e=1
             ;;
         0012)  # newline
-            printf "$line\n"
+            buf=$buf\\n x=0
             r=$R g=$G b=$B s=$S
             color_cycle $dy
             R=$r G=$g B=$b S=$s
-            x=0 line=
             ;;
         0011)  # tab
             color_cycle $dx
@@ -123,21 +122,23 @@ color_cycle() {
             x=$((x+1))
             ;;
         0???)  # utf8 continuation byte
-            line=$line\\$o
+            buf=$buf\\$o
             ;;
         1???)  # first char after esc. 133 is '[', 050/051 are '(',')' stay(rom)
-            [ $esc = no ] || line=$line\\$o
+            [ $esc = no ] || buf=$buf\\$o
             case $o in 133) e=2;; 05[01]) ;; *) e=0; esac
             ;;
         2???)  # inside CSI sequence
-            [ $esc = no ] || line=$line\\$o
+            [ $esc = no ] || buf=$buf\\$o
             case $o in 1??) e=0; esac
             ;;
         esac
       done
+      # flush $buf every other read (two od lines, up to ~800 bytes at $buf)
+      [ "$fl" ] && { printf "$buf"; buf= fl=; } || fl=x
     done
 
-    printf "$line\033[0m"
+    printf "$buf\033[0m"
     e=$octals  # last read is od exit code. print usage if e<128 (not signal)
     [ $e -gt 127 ] && exit $e || [ $e = 0 ] || err_exit "" x $e
 }
