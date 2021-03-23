@@ -53,8 +53,8 @@ done
 case $colors in 1|8) [ "$ab" ] || min=0 max=255; esac  # set full range if unset
 shift $((OPTIND-1))
 
-# list_as_octals prints stdin bytes as 3-digits octal values, several per line
-list_as_octals() { od -b -v -A n; }
+# list_as_octals prints input bytes as 3-digits octal values, several per line
+list_as_octals() { od -b -v -A n "$@"; }
 rand() { sd=$(echo ${sd:-$(date)$$}|cksum); rnd=$((1${sd%? *}%$1)); } # [0..$1)
 
 case $colors in
@@ -78,23 +78,21 @@ color_cycle() {
     esac
 }
 
-# main, pipefail-like: if `cat' succeeds then 0 byte is appended to its output,
-# else 'x' is appended, and the code checks the last byte to detect errors.
-# if `od' failed (assuming no output) then we also exit with an error.
-# We don't bother with the actual error codes, nor testing for native pipefail.
+# main, pipefail-like: after od succeeds/fails, we print its exit code in a new
+# line and without trailing newline. The last read processes this lone value
+# but returns error (EOF - no final \n), so we can identify the value easily.
 
-{ cat -- "$@" && printf \\0 || printf x; } | list_as_octals | {
+{ list_as_octals -- "$@" && printf \\n0 || printf \\n$?; } | {
     r=$max g=$min b=$min s=G+
     [ "$off" ] || { rand 100; off=$rnd; }  # 100x16 is full cycle with -a0 -b255
     while [ $off -gt 0 ]; do color_cycle 16; off=$((off-1)); done
 
     R=$r G=$g B=$b S=$s  # saved for next line
     x=0 e=0 line=  # column for tab tracking, esc state, line buffer
-    c= o=  # cur/prev octal. handling is delayed-by-1, last octal isn't printed
 
     trap 'printf \\033[0m' 2 3 6
     while read octals; do
-      for c in $octals; do
+      for o in $octals; do
         case $e$o in
         0033)  # esc
             [ "$esc" = no ] || line=$line\\$o
@@ -133,9 +131,9 @@ color_cycle() {
             case $o in 1??) e=0; esac
             ;;
         esac
-        o=$c  # current octal is handled at the next iteration, or below if EOF
       done
     done
+
     printf "$line\033[0m"
-    [ 000 = "$o" ] || err_exit  # last is 000 if cat succeeded + od translated
+    [ 0 = $octals ] || err_exit  # last is 0 if od suceesed
 }
